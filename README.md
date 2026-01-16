@@ -1,6 +1,6 @@
 # Chatbot Platform
 
-A full-stack chatbot platform built with Deno, React, and Gemini AI.
+A full-stack chatbot platform built with Bun, React, and Gemini AI.
 
 ## Features
 
@@ -14,8 +14,8 @@ A full-stack chatbot platform built with Deno, React, and Gemini AI.
 ## Tech Stack
 
 ### Backend
-- **Runtime**: Deno
-- **Framework**: Oak (HTTP server)
+- **Runtime**: Bun
+- **Framework**: Express
 - **Database**: PostgreSQL
 - **AI**: Google Gemini 2.5 Flash
 - **Auth**: JWT tokens
@@ -30,8 +30,7 @@ A full-stack chatbot platform built with Deno, React, and Gemini AI.
 ## Getting Started
 
 ### Prerequisites
-- Deno 2.x
-- Node.js 18+ (for frontend)
+- Bun
 - PostgreSQL database
 - Google Gemini API key
 
@@ -52,7 +51,7 @@ PORT=8000
 
 3. Run the backend:
 ```bash
-deno task dev
+bun run dev
 ```
 
 The backend will be available at `http://localhost:8000`
@@ -91,7 +90,7 @@ The Chatbot Platform follows a **client-server architecture** with clear separat
 ┌─────────────┐         HTTP/REST API          ┌─────────────┐
 │             │ ◄────────────────────────────► │             │
 │  Frontend   │      JSON over HTTPS           │   Backend   │
-│  (React)    │                                │   (Deno)    │
+│  (React)    │                                │   (Express) │
 │             │                                │             │
 └─────────────┘                                └──────┬──────┘
                                                       │
@@ -113,7 +112,7 @@ The Chatbot Platform follows a **client-server architecture** with clear separat
 
 ### Backend Architecture
 
-**Framework**: Oak (Deno's middleware framework similar to Express/Koa)
+**Framework**: Express (Node.js web framework running on Bun)
 
 **Key Components**:
 - **Routes Layer** (`src/routes/`): HTTP endpoint handlers organized by domain
@@ -221,7 +220,7 @@ messages
 **Gemini 2.5 Flash** is used for chat responses:
 - System prompts are configurable per project
 - Message history is sent for context-aware responses
-- Streaming responses (future enhancement opportunity)
+- Streaming responses 
 
 ## Project Structure
 
@@ -287,7 +286,7 @@ The platform uses the following main tables:
 ### Backend Development
 ```bash
 cd backend
-deno task dev
+bun run dev
 ```
 
 ### Frontend Development
@@ -301,7 +300,7 @@ npm run dev
 Backend:
 ```bash
 cd backend
-deno compile --allow-net --allow-env --allow-read src/main.ts
+bun build src/main.ts --compile --outfile chatbot-platform
 ```
 
 Frontend:
