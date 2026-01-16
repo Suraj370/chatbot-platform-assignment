@@ -1,32 +1,31 @@
-import { Context, Next } from "@oak/oak";
-import { verifyToken } from "../utils/jwt.ts";
-import type { AuthPayload } from "../types/index.ts";
+import { Request, Response, NextFunction } from "express";
+import { verifyToken } from "../utils/jwt.js";
+import type { AuthPayload } from "../types/index.js";
 
-export interface AuthState {
+export interface AuthRequest extends Request {
   auth?: AuthPayload;
 }
 
 export async function authMiddleware(
-  ctx: Context<AuthState>,
-  next: Next
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction
 ) {
-  const authHeader = ctx.request.headers.get("Authorization");
+  const authHeader = req.headers.authorization;
 
   if (!authHeader || !authHeader.startsWith("Bearer ")) {
-    ctx.response.status = 401;
-    ctx.response.body = { error: "Unauthorized: No token provided" };
+    res.status(401).json({ error: "Unauthorized: No token provided" });
     return;
   }
 
   const token = authHeader.slice(7); // Remove "Bearer " prefix
-  const payload = await verifyToken(token);
+  const payload = verifyToken(token);
 
   if (!payload) {
-    ctx.response.status = 401;
-    ctx.response.body = { error: "Unauthorized: Invalid token" };
+    res.status(401).json({ error: "Unauthorized: Invalid token" });
     return;
   }
 
-  ctx.state.auth = payload;
-  await next();
+  req.auth = payload;
+  next();
 }

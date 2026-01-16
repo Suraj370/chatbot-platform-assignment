@@ -1,14 +1,20 @@
-import { Pool } from "postgres";
+import pkg from 'pg';
+const { Pool } = pkg;
 
-let pool: Pool | null = null;
+let pool: pkg.Pool | null = null;
 
-export function getDb(): Pool {
+export function getDb(): pkg.Pool {
   if (!pool) {
-    const databaseUrl = Deno.env.get("DATABASE_URL");
+    const databaseUrl = process.env.DATABASE_URL;
     if (!databaseUrl) {
       throw new Error("DATABASE_URL environment variable is not set");
     }
-    pool = new Pool(databaseUrl, 10);
+    pool = new Pool({
+      connectionString: databaseUrl,
+      ssl: {
+        rejectUnauthorized: false
+      }
+    });
   }
   return pool;
 }
@@ -19,7 +25,7 @@ export async function initDatabase() {
 
   try {
     // Create users table
-    await client.queryObject`
+    await client.query(`
       CREATE TABLE IF NOT EXISTS users (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         email VARCHAR(255) UNIQUE NOT NULL,
@@ -27,10 +33,10 @@ export async function initDatabase() {
         created_at TIMESTAMP DEFAULT NOW(),
         updated_at TIMESTAMP DEFAULT NOW()
       )
-    `;
+    `);
 
     // Create projects table
-    await client.queryObject`
+    await client.query(`
       CREATE TABLE IF NOT EXISTS projects (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -40,10 +46,10 @@ export async function initDatabase() {
         created_at TIMESTAMP DEFAULT NOW(),
         updated_at TIMESTAMP DEFAULT NOW()
       )
-    `;
+    `);
 
     // Create prompts table
-    await client.queryObject`
+    await client.query(`
       CREATE TABLE IF NOT EXISTS prompts (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         project_id UUID NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
@@ -52,20 +58,20 @@ export async function initDatabase() {
         created_at TIMESTAMP DEFAULT NOW(),
         updated_at TIMESTAMP DEFAULT NOW()
       )
-    `;
+    `);
 
     // Create chats table
-    await client.queryObject`
+    await client.query(`
       CREATE TABLE IF NOT EXISTS chats (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         project_id UUID NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
         created_at TIMESTAMP DEFAULT NOW(),
         updated_at TIMESTAMP DEFAULT NOW()
       )
-    `;
+    `);
 
     // Create messages table
-    await client.queryObject`
+    await client.query(`
       CREATE TABLE IF NOT EXISTS messages (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         chat_id UUID NOT NULL REFERENCES chats(id) ON DELETE CASCADE,
@@ -73,21 +79,21 @@ export async function initDatabase() {
         content TEXT NOT NULL,
         created_at TIMESTAMP DEFAULT NOW()
       )
-    `;
+    `);
 
     // Create indexes for better performance
-    await client.queryObject`
+    await client.query(`
       CREATE INDEX IF NOT EXISTS idx_projects_user_id ON projects(user_id)
-    `;
-    await client.queryObject`
+    `);
+    await client.query(`
       CREATE INDEX IF NOT EXISTS idx_prompts_project_id ON prompts(project_id)
-    `;
-    await client.queryObject`
+    `);
+    await client.query(`
       CREATE INDEX IF NOT EXISTS idx_chats_project_id ON chats(project_id)
-    `;
-    await client.queryObject`
+    `);
+    await client.query(`
       CREATE INDEX IF NOT EXISTS idx_messages_chat_id ON messages(chat_id)
-    `;
+    `);
 
     console.log("✅ Database tables initialized successfully");
   } catch (error) {

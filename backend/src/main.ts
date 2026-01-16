@@ -1,79 +1,54 @@
-import { Application } from "@oak/oak";
-import { load } from "@std/dotenv";
-import { initDatabase } from "./utils/db.ts";
-import authRouter from "./routes/auth.ts";
-import projectsRouter from "./routes/projects.ts";
-import promptsRouter from "./routes/prompts.ts";
-import chatsRouter from "./routes/chats.ts";
+import express from "express";
+import cors from "cors";
+import dotenv from "dotenv";
+import { initDatabase } from "./utils/db.js";
+import authRouter from "./routes/auth.js";
+import projectsRouter from "./routes/projects.js";
+import promptsRouter from "./routes/prompts.js";
+import chatsRouter from "./routes/chats.js";
 
 // Load environment variables
-await load({ export: true });
+dotenv.config();
 
-const app = new Application();
-const PORT = parseInt(Deno.env.get("PORT") || "8000");
+const app = express();
+const PORT = parseInt(process.env.PORT || "8000");
 
-// CORS middleware
-app.use(async (ctx, next) => {
-  ctx.response.headers.set("Access-Control-Allow-Origin", "*");
-  ctx.response.headers.set(
-    "Access-Control-Allow-Methods",
-    "GET, POST, PUT, DELETE, OPTIONS"
-  );
-  ctx.response.headers.set(
-    "Access-Control-Allow-Headers",
-    "Content-Type, Authorization"
-  );
-
-  if (ctx.request.method === "OPTIONS") {
-    ctx.response.status = 204;
-    return;
-  }
-
-  await next();
-});
-
-// Error handling middleware
-app.use(async (ctx, next) => {
-  try {
-    await next();
-  } catch (err) {
-    console.error("Server error:", err);
-    ctx.response.status = 500;
-    ctx.response.body = { error: "Internal server error" };
-  }
-});
+// Middleware
+app.use(cors());
+app.use(express.json());
 
 // Logging middleware
-app.use(async (ctx, next) => {
+app.use((req, res, next) => {
   const start = Date.now();
-  await next();
-  const ms = Date.now() - start;
-  console.log(`${ctx.request.method} ${ctx.request.url} - ${ms}ms`);
+  res.on("finish", () => {
+    const ms = Date.now() - start;
+    console.log(`${req.method} ${req.url} - ${ms}ms`);
+  });
+  next();
 });
 
 // Health check endpoint
-app.use(async (ctx, next) => {
-  if (ctx.request.url.pathname === "/health") {
-    ctx.response.body = { status: "ok" };
-    return;
-  }
-  await next();
+app.get("/health", (req, res) => {
+  res.json({ status: "ok" });
 });
 
 // Mount routers
-app.use(authRouter.routes());
-app.use(authRouter.allowedMethods());
-app.use(projectsRouter.routes());
-app.use(projectsRouter.allowedMethods());
-app.use(promptsRouter.routes());
-app.use(promptsRouter.allowedMethods());
-app.use(chatsRouter.routes());
-app.use(chatsRouter.allowedMethods());
+app.use(authRouter);
+app.use(projectsRouter);
+app.use(promptsRouter);
+app.use(chatsRouter);
+
+// Error handling middleware
+app.use((err: Error, req: express.Request, res: express.Response, next: express.NextFunction) => {
+  console.error("Server error:", err);
+  res.status(500).json({ error: "Internal server error" });
+});
 
 // Initialize database
 console.log("🔄 Initializing database...");
 await initDatabase();
 
 // Start server
-console.log(`🚀 Server running on http://localhost:${PORT}`);
-await app.listen({ port: PORT });
+app.listen(PORT, () => {
+  console.log(`🚀 Server running on http://localhost:${PORT}`);
+});

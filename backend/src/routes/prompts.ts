@@ -1,89 +1,87 @@
-import { Router } from "@oak/oak";
-import { authMiddleware } from "../middleware/auth.ts";
-import { getDb } from "../utils/db.ts";
-import type { Prompt, Project, CreatePromptRequest } from "../types/index.ts";
+import { Router } from "express";
+import { authMiddleware, type AuthRequest } from "../middleware/auth.js";
+import { getDb } from "../utils/db.js";
+import type { Prompt, Project, CreatePromptRequest } from "../types/index.js";
 
-const router = new Router();
+const router = Router();
 
 // Get all prompts for a project
-router.get("/projects/:projectId/prompts", authMiddleware, async (ctx) => {
+router.get("/projects/:projectId/prompts", authMiddleware, async (req: AuthRequest, res) => {
   try {
-    const userId = ctx.state.auth!.userId;
-    const projectId = ctx.params.projectId;
+    const userId = req.auth!.userId;
+    const projectId = req.params.projectId;
     const db = getDb();
     const client = await db.connect();
 
     try {
       // Verify project belongs to user
-      const projectCheck = await client.queryObject<Project>`
-        SELECT id FROM projects WHERE id = ${projectId} AND user_id = ${userId}
-      `;
+      const projectCheck = await client.query<Project>(
+        "SELECT id FROM projects WHERE id = $1 AND user_id = $2",
+        [projectId, userId]
+      );
 
       if (projectCheck.rows.length === 0) {
-        ctx.response.status = 404;
-        ctx.response.body = { error: "Project not found" };
+        res.status(404).json({ error: "Project not found" });
         return;
       }
 
-      const result = await client.queryObject<Prompt>`
-        SELECT * FROM prompts WHERE project_id = ${projectId} ORDER BY created_at DESC
-      `;
+      const result = await client.query<Prompt>(
+        "SELECT * FROM prompts WHERE project_id = $1 ORDER BY created_at DESC",
+        [projectId]
+      );
 
-      ctx.response.body = { prompts: result.rows };
+      res.json({ prompts: result.rows });
     } finally {
       client.release();
     }
   } catch (error) {
     console.error("Get prompts error:", error);
-    ctx.response.status = 500;
-    ctx.response.body = { error: "Internal server error" };
+    res.status(500).json({ error: "Internal server error" });
   }
 });
 
 // Get a single prompt
-router.get("/projects/:projectId/prompts/:id", authMiddleware, async (ctx) => {
+router.get("/projects/:projectId/prompts/:id", authMiddleware, async (req: AuthRequest, res) => {
   try {
-    const userId = ctx.state.auth!.userId;
-    const projectId = ctx.params.projectId;
-    const promptId = ctx.params.id;
+    const userId = req.auth!.userId;
+    const projectId = req.params.projectId;
+    const promptId = req.params.id;
     const db = getDb();
     const client = await db.connect();
 
     try {
-      const result = await client.queryObject<Prompt & { user_id: string }>`
-        SELECT p.* FROM prompts p
-        JOIN projects pr ON p.project_id = pr.id
-        WHERE p.id = ${promptId} AND p.project_id = ${projectId} AND pr.user_id = ${userId}
-      `;
+      const result = await client.query<Prompt>(
+        `SELECT p.* FROM prompts p
+         JOIN projects pr ON p.project_id = pr.id
+         WHERE p.id = $1 AND p.project_id = $2 AND pr.user_id = $3`,
+        [promptId, projectId, userId]
+      );
 
       if (result.rows.length === 0) {
-        ctx.response.status = 404;
-        ctx.response.body = { error: "Prompt not found" };
+        res.status(404).json({ error: "Prompt not found" });
         return;
       }
 
-      ctx.response.body = { prompt: result.rows[0] };
+      res.json({ prompt: result.rows[0] });
     } finally {
       client.release();
     }
   } catch (error) {
     console.error("Get prompt error:", error);
-    ctx.response.status = 500;
-    ctx.response.body = { error: "Internal server error" };
+    res.status(500).json({ error: "Internal server error" });
   }
 });
 
 // Create a new prompt
-router.post("/projects/:projectId/prompts", authMiddleware, async (ctx) => {
+router.post("/projects/:projectId/prompts", authMiddleware, async (req: AuthRequest, res) => {
   try {
-    const userId = ctx.state.auth!.userId;
-    const projectId = ctx.params.projectId;
-    const body = await ctx.request.body.json() as CreatePromptRequest;
+    const userId = req.auth!.userId;
+    const projectId = req.params.projectId;
+    const body = req.body as CreatePromptRequest;
     const { name, content } = body;
 
     if (!name || !content) {
-      ctx.response.status = 400;
-      ctx.response.body = { error: "Name and content are required" };
+      res.status(400).json({ error: "Name and content are required" });
       return;
     }
 
@@ -92,41 +90,38 @@ router.post("/projects/:projectId/prompts", authMiddleware, async (ctx) => {
 
     try {
       // Verify project belongs to user
-      const projectCheck = await client.queryObject<Project>`
-        SELECT id FROM projects WHERE id = ${projectId} AND user_id = ${userId}
-      `;
+      const projectCheck = await client.query<Project>(
+        "SELECT id FROM projects WHERE id = $1 AND user_id = $2",
+        [projectId, userId]
+      );
 
       if (projectCheck.rows.length === 0) {
-        ctx.response.status = 404;
-        ctx.response.body = { error: "Project not found" };
+        res.status(404).json({ error: "Project not found" });
         return;
       }
 
-      const result = await client.queryObject<Prompt>`
-        INSERT INTO prompts (project_id, name, content)
-        VALUES (${projectId}, ${name}, ${content})
-        RETURNING *
-      `;
+      const result = await client.query<Prompt>(
+        "INSERT INTO prompts (project_id, name, content) VALUES ($1, $2, $3) RETURNING *",
+        [projectId, name, content]
+      );
 
-      ctx.response.status = 201;
-      ctx.response.body = { prompt: result.rows[0] };
+      res.status(201).json({ prompt: result.rows[0] });
     } finally {
       client.release();
     }
   } catch (error) {
     console.error("Create prompt error:", error);
-    ctx.response.status = 500;
-    ctx.response.body = { error: "Internal server error" };
+    res.status(500).json({ error: "Internal server error" });
   }
 });
 
 // Update a prompt
-router.put("/projects/:projectId/prompts/:id", authMiddleware, async (ctx) => {
+router.put("/projects/:projectId/prompts/:id", authMiddleware, async (req: AuthRequest, res) => {
   try {
-    const userId = ctx.state.auth!.userId;
-    const projectId = ctx.params.projectId;
-    const promptId = ctx.params.id;
-    const body = await ctx.request.body.json() as Partial<CreatePromptRequest>;
+    const userId = req.auth!.userId;
+    const projectId = req.params.projectId;
+    const promptId = req.params.id;
+    const body = req.body as Partial<CreatePromptRequest>;
     const { name, content } = body;
 
     const db = getDb();
@@ -134,71 +129,70 @@ router.put("/projects/:projectId/prompts/:id", authMiddleware, async (ctx) => {
 
     try {
       // Verify project belongs to user and prompt exists
-      const check = await client.queryObject`
-        SELECT p.id FROM prompts p
-        JOIN projects pr ON p.project_id = pr.id
-        WHERE p.id = ${promptId} AND p.project_id = ${projectId} AND pr.user_id = ${userId}
-      `;
+      const check = await client.query(
+        `SELECT p.id FROM prompts p
+         JOIN projects pr ON p.project_id = pr.id
+         WHERE p.id = $1 AND p.project_id = $2 AND pr.user_id = $3`,
+        [promptId, projectId, userId]
+      );
 
       if (check.rows.length === 0) {
-        ctx.response.status = 404;
-        ctx.response.body = { error: "Prompt not found" };
+        res.status(404).json({ error: "Prompt not found" });
         return;
       }
 
-      const result = await client.queryObject<Prompt>`
-        UPDATE prompts
-        SET
-          name = COALESCE(${name}, name),
-          content = COALESCE(${content}, content),
-          updated_at = NOW()
-        WHERE id = ${promptId}
-        RETURNING *
-      `;
+      const result = await client.query<Prompt>(
+        `UPDATE prompts
+         SET
+           name = COALESCE($1, name),
+           content = COALESCE($2, content),
+           updated_at = NOW()
+         WHERE id = $3
+         RETURNING *`,
+        [name, content, promptId]
+      );
 
-      ctx.response.body = { prompt: result.rows[0] };
+      res.json({ prompt: result.rows[0] });
     } finally {
       client.release();
     }
   } catch (error) {
     console.error("Update prompt error:", error);
-    ctx.response.status = 500;
-    ctx.response.body = { error: "Internal server error" };
+    res.status(500).json({ error: "Internal server error" });
   }
 });
 
 // Delete a prompt
-router.delete("/projects/:projectId/prompts/:id", authMiddleware, async (ctx) => {
+router.delete("/projects/:projectId/prompts/:id", authMiddleware, async (req: AuthRequest, res) => {
   try {
-    const userId = ctx.state.auth!.userId;
-    const projectId = ctx.params.projectId;
-    const promptId = ctx.params.id;
+    const userId = req.auth!.userId;
+    const projectId = req.params.projectId;
+    const promptId = req.params.id;
     const db = getDb();
     const client = await db.connect();
 
     try {
-      const result = await client.queryObject`
-        DELETE FROM prompts p
-        USING projects pr
-        WHERE p.id = ${promptId} AND p.project_id = ${projectId}
-          AND p.project_id = pr.id AND pr.user_id = ${userId}
-        RETURNING p.id
-      `;
+      const result = await client.query(
+        `DELETE FROM prompts p
+         USING projects pr
+         WHERE p.id = $1 AND p.project_id = $2
+           AND p.project_id = pr.id AND pr.user_id = $3
+         RETURNING p.id`,
+        [promptId, projectId, userId]
+      );
 
       if (result.rows.length === 0) {
-        ctx.response.status = 404;
-        ctx.response.body = { error: "Prompt not found" };
+        res.status(404).json({ error: "Prompt not found" });
         return;
       }
 
-      ctx.response.status = 204;
+      res.status(204).send();
     } finally {
       client.release();
     }
   } catch (error) {
     console.error("Delete prompt error:", error);
-    ctx.response.status = 500;
-    ctx.response.body = { error: "Internal server error" };
+    res.status(500).json({ error: "Internal server error" });
   }
 });
 
