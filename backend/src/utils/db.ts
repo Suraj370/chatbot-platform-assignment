@@ -9,11 +9,15 @@ export function getDb(): pkg.Pool {
     if (!databaseUrl) {
       throw new Error("DATABASE_URL environment variable is not set");
     }
+
+    // Only use SSL for production databases (not localhost)
+    const isProduction = !databaseUrl.includes('localhost') && !databaseUrl.includes('127.0.0.1');
+
     pool = new Pool({
       connectionString: databaseUrl,
-      ssl: {
+      ssl: isProduction ? {
         rejectUnauthorized: false
-      }
+      } : false
     });
   }
   return pool;

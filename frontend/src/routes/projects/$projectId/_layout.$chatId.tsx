@@ -6,6 +6,7 @@ import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Field } from '@/components/ui/field'
 import { useForm } from '@tanstack/react-form'
+import { MarkdownRenderer } from '@/components/markdown-renderer'
 import * as z from 'zod'
 export const Route = createFileRoute('/projects/$projectId/_layout/$chatId')({
   component: RouteComponent,
@@ -129,7 +130,7 @@ function RouteComponent() {
                    : 'bg-white'
                }`}
              >
-               {m.content}
+               <MarkdownRenderer content={m.content} />
              </Card>
            </div>
          ))}
